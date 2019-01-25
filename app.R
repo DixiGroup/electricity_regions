@@ -19,6 +19,7 @@ library(gridExtra)
 library(grid)
 library(stringr)
 
+options(shiny.maxRequestSize=30*1024^2)
 
 # Define UI for data upload app ----
 ui <- fluidPage(
@@ -72,7 +73,13 @@ ui <- fluidPage(
                           textInput("customsubtitle", label = "Підзаголовок у файлі")),
                    
                    column(2,
-                          disabled(downloadButton('downloadData', 'Завантажити мапу')))))
+                          disabled(downloadButton('downloadData', 'Завантажити мапу')))),
+               fluidRow(tags$hr(),
+                        column(12, 
+                               img(src = "./dixilogo_small.png"))),
+               fluidRow(column(12, 
+                               helpText("Виконання цього інструменту стало можливим завдяки підтримці американського народу, наданій через Агентство США з міжнародного розвитку (USAID). Дані, що використані в цьому інструменті, є виключною відповідальністю їх власників і за жодних обставин не можуть розглядатися як такі, що відображають позицію DiXi Group, USAID чи Уряду США.")))
+               )
            
     )
 )
@@ -93,7 +100,7 @@ server <- function(session, input, output) {
             {
                 debt <- read_delim(input$file1$datapath, delim = ",", locale = locale(decimal_mark = ".", encoding = "UTF-8"))
                 debt <- debt %>% 
-                    dplyr::select(-company, -debt_year_start) %>% 
+                    dplyr::select(-debt_year_start) %>% 
                     dplyr::select(year:paid_month_tuah) %>%  
                     dplyr::group_by(year, month, oblast, consumer_cat, consumer_type) %>% 
                     #group_by(-consumption_tkwth, -consumption_tuah, -debt_month_start) %>% 
@@ -136,8 +143,12 @@ server <- function(session, input, output) {
                 )
                 
                 # plot updating 
+
                 output$regional_plot <- renderPlot({
                     var <- input$variable_name
+                    vars <- c("paid_month_tuah",  "consumption_tkwth", "consumption_tuah", "debt_month_start" )
+                    vars_to_exclude <- vars[vars != var]
+                    vars_to_keep <- names(debt)[!names(debt) %in% vars_to_exclude]
                     dates_selected <- input$date_range
                     period1 <- strsplit(dates_selected[1], " ")[[1]]
                     month1 <- which(ua_monthes == period1[1])
@@ -146,6 +157,8 @@ server <- function(session, input, output) {
                     month2 <- which(ua_monthes == period2[1])
                     year2 <- as.integer(period2[2])
                     category <- input$cons_category
+                    debt <- debt %>% 
+                        select(one_of(vars_to_keep))
                     if (length(input$cats) > 0) 
                     {
                         if (category == "Усі") {
@@ -236,8 +249,12 @@ server <- function(session, input, output) {
             #leftest_panel <- min(pl_local$layout$l[grepl("panel", pl_local$layout$name)])
             #leftest_panel <- min(pl_local$layout$l[grepl("axis-l", pl_local$layout$name)])
             #print(leftest_panel)
+            vjust <- .45
+            hjust <- 0
             caption_row  <- pl_local$layout$b[pl_local$layout$name == "caption"]
-            pl_local <- gtable_add_grob(pl_local, rasterGrob(logo), caption_row - 2, leftest_panel, caption_row, leftest_panel, name = "logo")
+            leftest_panel <- pl_local$layout$l[pl_local$layout$name == "ylab-l"]
+            #pl_local <- gtable_add_grob(pl_local, rasterGrob(logo), caption_row - 2, leftest_panel, caption_row, leftest_panel, name = "logo")
+            pl_local <- gtable_add_grob(pl_local, rasterGrob(logo), caption_row, leftest_panel, caption_row, leftest_panel, name = "logo")
             #logo_side <- h / 10 
             pl_local$grobs[[which(pl_local$layout$name == "logo")]]$height <- unit(logo_side, "in")
             pl_local$grobs[[which(pl_local$layout$name == "logo")]]$width <-  unit(logo_side, "in")
